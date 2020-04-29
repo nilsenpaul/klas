@@ -50,10 +50,17 @@ final class Group
             if ($student->hasSegment()) {
                 continue;
             }
-            asort($counts);
-            reset($counts);
-            $nextSegment = key($counts);
-            $student->setSegment($nextSegment, Student::REASON_RANDOM);
+
+            if ($student->getPreference() > 0) {
+                $nextSegment = $student->getPreference() - 1;
+                $student->setSegment($nextSegment, Student::REASON_FROM_PREFERENCE);
+            } else {
+                asort($counts);
+                reset($counts);
+                $nextSegment = key($counts);
+                $student->setSegment($nextSegment, Student::REASON_RANDOM);
+            }
+            
             $counts[$nextSegment]++;
         }
     }

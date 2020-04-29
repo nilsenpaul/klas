@@ -11,6 +11,8 @@ final class School
 {
     /** @var Address[] */
     private $addresses = [];
+    /** @var Zipcode[] */
+    private $zipcodes = [];
     /** @var Group[] */
     private $groups = [];
 
@@ -34,6 +36,28 @@ final class School
         }
 
         return $this->addresses[$address];
+    }
+
+    public function getZipcodeByString(string $zipcode): Zipcode
+    {
+        // compare lower case
+        $zipcode = strtolower($zipcode);
+
+        // remove spaces around the address
+        $zipcode = trim($zipcode);
+
+        // remove multiple whitespace in the address
+        $zipcode = preg_replace('/\s+/', ' ', $zipcode);
+
+        if ($zipcode === '') {
+            $zipcode = uniqid();
+        }
+
+        if (!array_key_exists($zipcode, $this->zipcodes)) {
+            $this->zipcodes[$zipcode] = new Zipcode($zipcode);
+        }
+
+        return $this->zipcodes[$zipcode];
     }
 
     public function getGroupByName(string $name): Group
@@ -60,8 +84,14 @@ final class School
             }
 
             $segment = $i % $nrSegments;
+            $reason = Student::REASON_FROM_ADDRESS;
             foreach ($address->getStudents() as $student) {
-                $student->setSegment($segment, Student::REASON_FROM_ADDRESS);
+                if ($student->getPreference() > 0) {
+                    $segment = $student->getPreference() - 1;
+                    $reason = Student::REASON_FROM_PREFERENCE;
+                }
+
+                $student->setSegment($segment, $reason);
             }
             $i++;
         }
@@ -112,6 +142,8 @@ final class School
             $groupName = (string) $sheet->getCell('A' . $row->getRowIndex())->getValue();
             $studentName = (string) $sheet->getCell('B' . $row->getRowIndex())->getValue();
             $addressString = (string) $sheet->getCell('C' . $row->getRowIndex())->getValue();
+            $zipcodeString = (string) $sheet->getCell('D' . $row->getRowIndex())->getValue();
+            $preference = (int) $sheet->getCell('E' . $row->getRowIndex())->getValue();
 
             if ($groupName === "" || $studentName === "") {
                 continue;
@@ -119,11 +151,13 @@ final class School
 
             $group = $school->getGroupByName($groupName);
             $address = $school->getAddressByString($addressString);
+            $zipcode = $school->getZipcodeByString($zipcodeString);
 
-            $student = new Student($group, $studentName, $address);
+            $student = new Student($group, $studentName, $address, $zipcode, $preference);
 
             $group->addStudent($student);
             $address->addStudent($student);
+            $zipcode->addStudent($student);
         }
 
         return $school;
@@ -140,8 +174,10 @@ final class School
         $sheet->getCell('A1')->setValue('Klas');
         $sheet->getCell('B1')->setValue('Leerling');
         $sheet->getCell('C1')->setValue('Adres');
-        $sheet->getCell('D1')->setValue('Segment');
-        $sheet->getCell('E1')->setValue('Ingedeeld op');
+        $sheet->getCell('D1')->setValue('Postcode');
+        $sheet->getCell('E1')->setValue('Segment');
+        $sheet->getCell('F1')->setValue('Voorkeur');
+        $sheet->getCell('G1')->setValue('Ingedeeld op');
 
         $i = 2;
         foreach ($this->groups as $group) {
@@ -150,8 +186,10 @@ final class School
                 $sheet->getCell('A' . $i)->setValue($group->getName());
                 $sheet->getCell('B' . $i)->setValue($student->getName());
                 $sheet->getCell('C' . $i)->setValue($student->getAddress()->getAddress());
-                $sheet->getCell('D' . $i)->setValue($student->getSegmentPlusOne());
-                $sheet->getCell('E' . $i)->setValue($student->getSegmentReason());
+                $sheet->getCell('D' . $i)->setValue($student->getZipcode()->getZipcode());
+                $sheet->getCell('E' . $i)->setValue($student->getSegmentPlusOne());
+                $sheet->getCell('F' . $i)->setValue($student->getPreference());
+                $sheet->getCell('G' . $i)->setValue($student->getSegmentReason());
                 $i++;
             }
         }
